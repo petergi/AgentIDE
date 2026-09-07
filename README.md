@@ -99,14 +99,10 @@ updates.
   by `script/bootstrap`; `mosh` only matters from a phone.
 - Xcode 27 or later, only to build from source.
 
-### Ubuntu (experimental)
+### Ubuntu (parked)
 
-- Ubuntu 24.04 or 26.04 LTS.
-- `contrib/agentide-sandbox` (`enter` + bubblewrap + dedicated
-  `sandvault-<user>`), installed once as root.
-- Host-side `gh`, plus `herdr` for the sandbox user.
-- Swift 6.2+ from swift.org to build `agentide-core`; see `Linux/` for
-  the GTK4/libadwaita shell (Meson + Vala).
+Linux GTK, sandbox `enter` and the inotify stand-in live on
+`pause/linux`. This branch does not grow them.
 
 ## 📦 Installation
 
@@ -134,14 +130,16 @@ script/install
 `script/install` copies the built app into /Applications so the running
 copy survives rebuilds. A first launch creates `repositories/` and
 `worktrees/` in the shared workspace if they are not there yet. See
-[Ports / this fork](#-ports--this-fork) for `agentide-core` and the
-Ubuntu scaffolding.
+[Ports / this fork](#-ports--this-fork) for `agentide-core`; Linux
+work is on `pause/linux`.
 
 ## 🌐 Ports / this fork
 
-Work on `cross-platform` shares Domain, Data and Runtime across macOS
-and Ubuntu; the SwiftUI UI stays Mac-only. None of this is a shipping
-Linux desktop, and the Homebrew cask is not built from this fork.
+This branch is the Mac app. Linux GTK, `contrib/agentide-sandbox` and
+the inotify stand-in are parked on `pause/linux` until the Mac path is
+finished. Shared Domain, Data and Runtime stay in this tree; do not
+grow the Ubuntu shell here. The Homebrew cask is not built from this
+fork.
 
 - **`agentide-core`**: NDJSON stdin/stdout bridge over Domain, Data and
   Runtime. Commands: `ping`, `status`, `roots`, `overview`, `quit`
@@ -153,20 +151,9 @@ Linux desktop, and the Homebrew cask is not built from this fork.
   script/agentide-core-smoke
   ```
 
-- **`contrib/agentide-sandbox`**: Linux `enter` helper that `exec`s
-  bubblewrap as `sandvault-<host>`; sudoers allows only that path.
-  Install once as root (`sudo ./install.sh`); see its README.
-
-- **`Linux/`**: experimental Meson + Vala Adwaita shell that owns
-  `agentide-core` as a child process. The sidebar lists `overview`
-  worktrees; the content pane is a VTE placeholder when built with
-  `vte-2.91-gtk4`. No session attach yet. Build notes live in
-  `Linux/README.md`.
-
-- **Shared seams**: `Sources/AgentIDERuntime` (refresh coalescing),
-  `PlatformRoots` (host/shared/sandbox paths per OS) and
-  `SandboxLaunching` (`SandvaultLauncher` on Mac;
-  `LinuxSandboxLauncher` on Linux).
+- **Parked on `pause/linux`**: `Linux/` (experimental Adwaita shell),
+  `contrib/agentide-sandbox` (bubblewrap `enter`), and the Linux file
+  watcher. Resume there only after the Mac app is polished.
 
 Mac app from this tree: `script/bootstrap`, then `script/build` or
 `script/install` (→ /Applications). Architecture detail is in

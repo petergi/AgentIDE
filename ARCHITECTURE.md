@@ -13,9 +13,9 @@ AgentIDE is a native SwiftUI macOS app (macOS 15 or later, built with
 Swift 6.4 / Xcode 27, AGPL-3.0) that runs, steers and reviews
 sandboxed AI coding agents in parallel git worktrees. Its user
 supervises rather than types, so the window is arranged around the
-agent loop, not around an editor. Ubuntu 24.04/26.04 has experimental
-scaffolding: `agentide-core` over Domain/Data/Runtime, `agentide-sandbox`
-(bubblewrap), and a GTK4/libadwaita shell under `Linux/`.
+agent loop, not around an editor. Ubuntu scaffolding (`Linux/`,
+`contrib/agentide-sandbox`, the inotify stand-in) is parked on
+`pause/linux`; this branch is the Mac app.
 
 The architectural thesis, referenced throughout: **AgentIDE holds no
 session-critical state**. Agents run as the sandvault sandbox user inside
@@ -385,8 +385,8 @@ flowchart TD
 - **AgentIDERuntime**: the shared poll and reconcile loop
   (`RefreshCoalescer` today). Mac SwiftUI and the Linux GTK shell both
   drive it; Phase 0 extracts refresh coalescing from `DashboardModel`.
-  Linux UI scaffolding lives under `Linux/` (Adwaita + Meson):
-  `overview` in the sidebar and a VTE placeholder pane.
+  Linux UI scaffolding is parked on `pause/linux`; do not grow it
+  here while the Mac app is the product.
 - **Feature targets** (`DashboardFeature`, `SessionFeature`,
   `ReviewFeature`, `PRFeature`): SwiftUI views and `@Observable`
   MainActor models given the service by injection. Mac-only;
