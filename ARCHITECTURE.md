@@ -378,8 +378,10 @@ flowchart TD
   `UPowerSource`), `PlatformRoots`, and `AgentRunner` with
   `ClaudeCodeRunner` and `CodexRunner`.
 - **agentide-core**: a small NDJSON stdin/stdout executable over Domain,
-  Data and Runtime (`ping`, `roots`, `quit`) that the Linux GTK shell
-  speaks to; available on every platform SwiftPM builds.
+  Data and Runtime (`ping`, `status`, `roots`, `overview`, `quit`) that
+  the Linux GTK shell speaks to; available on every platform SwiftPM
+  builds. `status` names the platform and version; `overview` flattens
+  `SessionService.overview` into stable worktree rows.
 - **AgentIDERuntime**: the shared poll and reconcile loop
   (`RefreshCoalescer` today). Mac SwiftUI and the Linux GTK shell both
   drive it; Phase 0 extracts refresh coalescing from `DashboardModel`.

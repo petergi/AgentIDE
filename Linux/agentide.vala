@@ -1,7 +1,7 @@
 /* AgentIDE Linux shell: Adwaita window that speaks NDJSON to
  * agentide-core. VTE comes later; this only proves the bridge. */
 
-private async void ping_core (Gtk.Label status) {
+private async void probe_core (Gtk.Label status) {
     try {
         string[] argv = { "agentide-core" };
         var flags = SubprocessFlags.STDIN_PIPE
@@ -12,13 +12,13 @@ private async void ping_core (Gtk.Label status) {
         var stdin = proc.get_stdin_pipe ();
         var stdout = new DataInputStream (proc.get_stdout_pipe ());
 
-        stdin.write_all ("{\"cmd\":\"ping\"}\n".data, null);
+        stdin.write_all ("{\"cmd\":\"status\"}\n{\"cmd\":\"quit\"}\n".data, null);
         stdin.close ();
 
         size_t length;
         string? line = yield stdout.read_line_async (Priority.DEFAULT, null, out length);
-        if (line != null && line.contains ("\"pong\":true")) {
-            status.label = "agentide-core: pong";
+        if (line != null && line.contains ("\"ok\":true")) {
+            status.label = "agentide-core: " + line;
         } else {
             status.label = "agentide-core: unexpected reply";
         }
@@ -52,7 +52,7 @@ int main (string[] args) {
         window.content = split;
         window.present ();
 
-        ping_core.begin (status);
+        probe_core.begin (status);
     });
     return app.run (args);
 }

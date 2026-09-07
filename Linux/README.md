@@ -36,8 +36,29 @@ export PATH="$(pwd)/../.build/debug:${PATH}"
 ```
 
 The window titles itself AgentIDE, shows a sidebar placeholder, and
-spawns `agentide-core` with a `ping` command. A successful reply
-updates the content label to `agentide-core: pong`.
+spawns `agentide-core` with a `status` command. A successful reply
+updates the content label with the platform and version.
+
+Smoke the NDJSON bridge without GTK:
+
+```bash
+script/agentide-core-smoke
+```
+
+## agentide-core commands
+
+One JSON object per stdin line; one reply object per stdout line.
+
+| cmd | reply |
+| --- | --- |
+| `ping` | `{ok, pong}` |
+| `status` | `{ok, platform, version, sandboxed}` |
+| `roots` | `{ok, hostUser, sharedWorkspace, sandboxHome, metadataFile, sharedTemporaryDirectory}` |
+| `overview` | `{ok, worktrees:[{repositoryName, worktreePath, branch, sessionName?, agentActivity?}]}` |
+| `quit` | `{ok}` |
+
+Unknown commands and invalid JSON answer `{ok:false, error:"…"}`
+without exiting.
 
 ## Sandbox
 
