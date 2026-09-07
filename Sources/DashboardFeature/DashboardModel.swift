@@ -1,5 +1,6 @@
 import AgentIDEData
 import AgentIDEDomain
+import AgentIDERuntime
 import Foundation
 import Observation
 import TerminalUI
@@ -26,6 +27,7 @@ public final class DashboardModel {
         self.store = store
         self.github = github
         self.launchProgress = launchProgress
+        runtime = AgentIDERuntime()
         watcher = service.makeWorkspaceWatcher()
         watcher.start()
         restoreCachedSidebar()
@@ -134,7 +136,7 @@ public final class DashboardModel {
             clearUnread(at: selection.worktree.path)
             // A fresh selection reads its repository's git on the
             // next tick rather than waiting out a safety interval.
-            pendingForces.insert(selection.worktree.repositoryPath)
+            runtime.refresh.force(selection.worktree.repositoryPath)
         }
     }
 
@@ -336,7 +338,11 @@ public final class DashboardModel {
 
     /// The file-system events that say which repository is worth
     /// asking git about; the git reads extension consumes it.
-    let watcher: WorkspaceWatcher
+    let watcher: any FileWatching
+
+    /// Shared poll and reconcile loop; Phase 0 holds refresh
+    /// coalescing here so a future Linux UI can reuse it.
+    let runtime: AgentIDERuntime
 
     /// Models each CLI reported, seeded from the last launch's answer
     /// by the cache extension; absent agents fall back.
@@ -351,22 +357,6 @@ public final class DashboardModel {
     /// again for a render.
     var installedVersions: [AgentKind: String] = [:]
 
-    /// The newest reading (running or queued), the queued follow-up
-    /// while one is joinable, and the repositories queued to be
-    /// forced: what lets `refresh` coalesce callers instead of
-    /// stacking whole readings. Stored here because extensions
-    /// cannot hold state; the refresh extension file is the only
-    /// thing that touches them.
-    var refreshTask: Task<Void, Never>?
-    var queuedRefresh: Task<Void, Never>?
-    var pendingForces: Set<String> = []
-
-    /// Whether the next reading asks herdr for its pane listing:
-    /// every action and agent change says so, the poll only when
-    /// the listing's safety interval has passed. True at launch,
-    /// since nothing has been listed yet.
-    var pendingPaneRead = true
-
     /// When herdr was last asked, for the poll's safety interval.
     var panesReadAt: Date?
 
@@ -380,7 +370,7 @@ public final class DashboardModel {
     /// Every pull request question the sidebar asks goes through
     /// here, which holds both the answers and when they arrived.
     var pullRequests: PullRequestStore {
-        PullRequestStore(github: github, store: store)
+        PullRequestStore(github: github, store: store, onBattery: isOnBattery)
     }
 
     // MARK: Private

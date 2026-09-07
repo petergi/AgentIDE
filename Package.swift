@@ -7,19 +7,72 @@ let approachableConcurrency: [SwiftSetting] = [
 ]
 let mainActorByDefault = approachableConcurrency + [.defaultIsolation(MainActor.self)]
 
-let package = Package(
-    name: "AgentIDE",
-    platforms: [.macOS("27.0")],
-    products: [
-        .library(name: "AgentIDEDomain", targets: ["AgentIDEDomain"]),
-        .library(name: "AgentIDEData", targets: ["AgentIDEData"]),
+var products: [Product] = [
+    .library(name: "AgentIDEDomain", targets: ["AgentIDEDomain"]),
+    .library(name: "AgentIDEData", targets: ["AgentIDEData"]),
+    .library(name: "AgentIDERuntime", targets: ["AgentIDERuntime"]),
+    .executable(name: "agentide-core", targets: ["agentide-core"]),
+]
+
+var packageDependencies: [Package.Dependency] = []
+
+var targets: [Target] = [
+    .target(
+        name: "AgentIDEDomain",
+        swiftSettings: approachableConcurrency,
+    ),
+    .target(
+        name: "AgentIDEData",
+        dependencies: ["AgentIDEDomain"],
+        swiftSettings: approachableConcurrency,
+        linkerSettings: {
+            #if os(macOS)
+                // CI's runners boot an older macOS than the SDK they build
+                // with, so a hard link aborts every test bundle at
+                // load over missing FoundationModels symbols; weak
+                // linking defers to the availability guard in
+                // FoundationModelClient.
+                return [
+                    .unsafeFlags([
+                        "-Xlinker", "-weak_framework",
+                        "-Xlinker", "FoundationModels",
+                    ]),
+                ]
+            #else
+                return []
+            #endif
+        }(),
+    ),
+    .target(
+        name: "AgentIDERuntime",
+        dependencies: ["AgentIDEDomain", "AgentIDEData"],
+        swiftSettings: approachableConcurrency,
+    ),
+    .executableTarget(
+        name: "agentide-core",
+        dependencies: ["AgentIDEDomain", "AgentIDEData", "AgentIDERuntime"],
+        path: "Sources/AgentIDECore",
+        swiftSettings: approachableConcurrency,
+    ),
+    .testTarget(
+        name: "AgentIDEDomainTests",
+        dependencies: ["AgentIDEDomain"],
+        swiftSettings: approachableConcurrency,
+    ),
+]
+
+#if os(macOS)
+    products += [
+        // Feature, TerminalUI and App targets are Mac-only; Linux
+        // builds Domain/Data/Runtime and agentide-core only.
         .library(name: "DashboardFeature", targets: ["DashboardFeature"]),
         .library(name: "SessionFeature", targets: ["SessionFeature"]),
         .library(name: "ReviewFeature", targets: ["ReviewFeature"]),
         .library(name: "PRFeature", targets: ["PRFeature"]),
         .library(name: "TerminalUI", targets: ["TerminalUI"]),
-    ],
-    dependencies: [
+    ]
+
+    packageDependencies += [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.19.0"),
         // Apple's GitHub-flavoured markdown parser; parsing by hand
         // kept misreading real review comments.
@@ -45,8 +98,9 @@ let package = Package(
             url: "https://github.com/alex-pinkus/tree-sitter-swift",
             revision: "31d17fe7e818a2048c808b5c6fdc2dc792f4f5b5",
         ),
-    ],
-    targets: [
+    ]
+
+    targets += [
         // The app shell's own sources, as a plain target so they can
         // be type-checked without Xcode. The app itself is still
         // built from `project.yml`, which owns its bundle, its icon
@@ -59,6 +113,7 @@ let package = Package(
             name: "AgentIDEAppSources",
             dependencies: [
                 "AgentIDEData",
+                "AgentIDERuntime",
                 "DashboardFeature",
                 "PRFeature",
                 "ReviewFeature",
@@ -70,25 +125,8 @@ let package = Package(
             swiftSettings: mainActorByDefault,
         ),
         .target(
-            name: "AgentIDEDomain",
-            swiftSettings: approachableConcurrency,
-        ),
-        .target(
-            name: "AgentIDEData",
-            dependencies: ["AgentIDEDomain"],
-            swiftSettings: approachableConcurrency,
-            linkerSettings: [
-                // CI's runners boot an older macOS than the 27.0 SDK
-                // they build with, so a hard link aborts every test
-                // bundle at load over missing FoundationModels
-                // symbols; weak linking defers to the availability
-                // guard in FoundationModelClient.
-                .unsafeFlags(["-Xlinker", "-weak_framework", "-Xlinker", "FoundationModels"]),
-            ],
-        ),
-        .target(
             name: "DashboardFeature",
-            dependencies: ["AgentIDEDomain", "AgentIDEData", "TerminalUI"],
+            dependencies: ["AgentIDEDomain", "AgentIDEData", "AgentIDERuntime", "TerminalUI"],
             swiftSettings: mainActorByDefault,
         ),
         .target(
@@ -134,13 +172,8 @@ let package = Package(
             swiftSettings: mainActorByDefault,
         ),
         .testTarget(
-            name: "AgentIDEDomainTests",
-            dependencies: ["AgentIDEDomain"],
-            swiftSettings: approachableConcurrency,
-        ),
-        .testTarget(
             name: "AgentIDEDataTests",
-            dependencies: ["AgentIDEData"],
+            dependencies: ["AgentIDEData", "AgentIDEDomain"],
             swiftSettings: approachableConcurrency,
         ),
         .testTarget(
@@ -168,5 +201,13 @@ let package = Package(
             dependencies: ["PRFeature"],
             swiftSettings: mainActorByDefault,
         ),
-    ],
+    ]
+#endif
+
+let package = Package(
+    name: "AgentIDE",
+    platforms: [.macOS("15.0")],
+    products: products,
+    dependencies: packageDependencies,
+    targets: targets,
 )

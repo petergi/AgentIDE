@@ -66,17 +66,24 @@ updates.
 
 ## 🚫 Out of Scope
 
-- Windows or Linux support; being a native macOS app is the point.
+- Windows support.
+- Flatpak (and the Mac App Store): neither can honestly `sudo` to another
+  uid or create the sandbox user, which is the same reason agents cannot
+  run as another user from those sandboxes.
 - Running agents without a sandboxed non-admin user.
-- Team, multi-user or hosted features: one developer, one Mac.
+- Team, multi-user or hosted features: one developer, one machine.
 - An agent marketplace or bundled models; bring your own agent CLI.
 - A native iOS app: SSH into `herdr` from any iOS client instead.
-- An updater or a Mac App Store build; Homebrew's cask upgrades it, and
-  the App Store sandbox forbids running agents as another user.
+- An updater of its own; on Mac, Homebrew's cask upgrades the app.
 
 ## 📋 Requirements
 
-- macOS Golden Gate (27) or later.
+### macOS (shipping product)
+
+- macOS Sequoia (15) or later. One binary; Liquid Glass and on-device
+  Foundation Models need macOS 26+. If a Sequoia host cannot load the
+  Swift 6.4 stdlib, raise the floor to macOS 26 and treat 15 as
+  unsupported rather than shipping a broken binary.
 - [Homebrew](https://brew.sh), which installs the rest.
 - [sandvault](https://github.com/webcoyote/sandvault), which creates the
   sandbox user and the shared workspace.
@@ -85,6 +92,15 @@ updates.
 - [`herdr`](https://herdr.dev) and [`mosh`](https://mosh.org), installed
   by `script/bootstrap`; `mosh` only matters from a phone.
 - Xcode 27 or later, only to build from source.
+
+### Ubuntu (experimental)
+
+- Ubuntu 24.04 or 26.04 LTS.
+- `contrib/agentide-sandbox` (`enter` + bubblewrap + dedicated
+  `sandvault-<user>`), installed once as root.
+- Host-side `gh`, plus `herdr` for the sandbox user.
+- Swift 6.2+ from swift.org to build `agentide-core`; see `Linux/` for
+  the GTK4/libadwaita shell (Meson + Vala).
 
 ## 📦 Installation
 
@@ -195,7 +211,9 @@ a bare `MAJOR.MINOR.PATCH` version.
 
 ## 🚧 Status
 
-Stable but changing daily. AgentIDE is being designed exclusively for
+Stable but changing daily on macOS. Ubuntu support is experimental
+scaffolding (`agentide-core`, `contrib/agentide-sandbox`, `Linux/`), not
+a shipping desktop yet. AgentIDE is being designed primarily for
 [@MikeMcQuaid](https://github.com/MikeMcQuaid)'s personal workflow;
 nothing here promises to suit anyone else's, interfaces and behaviour may
 break without notice and there is no support.

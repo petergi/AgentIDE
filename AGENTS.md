@@ -6,7 +6,9 @@ update them in the same commit when behaviour they describe changes.
 This repository is readme-driven: documentation leads, code follows.
 
 AgentIDE is a native SwiftUI macOS app for running, steering and
-reviewing sandboxed AI coding agents.
+reviewing sandboxed AI coding agents. Ubuntu scaffolding
+(`agentide-core`, `contrib/agentide-sandbox`, `Linux/`) shares Domain,
+Data and Runtime; the Mac SwiftUI UI stays Mac-only.
 
 Write sentence-case imperative commit messages without
 conventional-commit prefixes such as `feat:`, `fix:` or `chore:`.
@@ -67,6 +69,12 @@ conventional-commit prefixes such as `feat:`, `fix:` or `chore:`.
 - `script/`: development tasks
 - `Brewfile`: development dependencies
 - `.github/workflows/tests.yml`: CI
+- `Sources/AgentIDERuntime/`: UI-agnostic refresh coalescing shared by
+  Mac and Linux
+- `Sources/AgentIDECore/`: `agentide-core` NDJSON executable for the
+  Linux GTK shell (and Mac tests)
+- `contrib/agentide-sandbox/`: Linux `enter`, sudoers, install script
+- `Linux/`: experimental GTK4/libadwaita UI (Meson + Vala)
 
 ## Code Standards
 
@@ -408,6 +416,25 @@ Hard-won on macOS 27 beta; check before assuming they expired.
   (`herdr session stop <name>` as the sandbox user, or `herdr server
   reload-config` for config alone) to take effect: when finishing
   such a change, tell the user exactly what to restart or stop.
+
+### Linux platform notes
+
+- Shared workspace is `/var/lib/agentide/<host>`, sandbox home
+  `/home/sandvault-<host>`; never `/Users/Shared`.
+- The only privilege crossing is `sudo` to
+  `/usr/libexec/agentide/enter`, which execs bubblewrap. Never widen
+  sudoers to bare `/bin/bash` or `/usr/bin/env`.
+- Flatpak is out: nested bwrap and cross-uid sudo both fail closed.
+- File watching on Linux is mtime polling in
+  `InotifyWorkspaceWatcher` until a full inotify stream lands; treat
+  it as a stand-in, not the Mac FSEvents design.
+- Terminals in the GTK shell use VTE; do not port SwiftTerm or
+  `DiffHunkTextView`. Editor/diff use GtkSourceView; browser uses
+  WebKitGTK.
+- `agentide-core` is a child process the UI owns (NDJSON), not a
+  lingering daemon; herdr remains the long-lived session owner.
+- CI's `linux-domain` job runs Domain tests on Ubuntu 24.04; Feature
+  and App targets stay Mac-only in `Package.swift`.
 
 ### Required Before Each Commit
 

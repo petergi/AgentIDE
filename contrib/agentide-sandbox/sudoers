@@ -1,0 +1,10 @@
+# Sudoers template for AgentIDE's Linux sandbox entry.
+#
+# Replace $HOST with the GUI user's login name and install as
+# /etc/sudoers.d/agentide-$HOST (mode 0440). The host may run only
+# the enter helper as sandvault-$HOST, never a free-form shell.
+#
+# Example for host "alice":
+#   alice ALL=(sandvault-alice) NOPASSWD: /usr/libexec/agentide/enter
+
+$HOST ALL=(sandvault-$HOST) NOPASSWD: /usr/libexec/agentide/enter

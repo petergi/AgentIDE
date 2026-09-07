@@ -9,10 +9,13 @@ live in [AGENTS.md](AGENTS.md); this document does not repeat them.
 
 ## Overview
 
-AgentIDE is a native SwiftUI macOS app (macOS 27 or later, Swift 6.4,
-AGPL-3.0) that runs, steers and reviews sandboxed AI coding agents in
-parallel git worktrees. Its user supervises rather than types, so the
-window is arranged around the agent loop, not around an editor.
+AgentIDE is a native SwiftUI macOS app (macOS 15 or later, built with
+Swift 6.4 / Xcode 27, AGPL-3.0) that runs, steers and reviews
+sandboxed AI coding agents in parallel git worktrees. Its user
+supervises rather than types, so the window is arranged around the
+agent loop, not around an editor. Ubuntu 24.04/26.04 has experimental
+scaffolding: `agentide-core` over Domain/Data/Runtime, `agentide-sandbox`
+(bubblewrap), and a GTK4/libadwaita shell under `Linux/`.
 
 The architectural thesis, referenced throughout: **AgentIDE holds no
 session-critical state**. Agents run as the sandvault sandbox user inside
@@ -46,6 +49,33 @@ flowchart LR
     app -->|"gh CLI"| github
     agents -.->|"no credentials"| github
     ios -->|"SSH as sandbox user,<br/>then herdr attach"| herdr
+```
+
+Linux uses the same thesis with different paths and confinement:
+
+```mermaid
+flowchart LR
+    ssh["SSH client"]
+    subgraph ubuntu ["Ubuntu"]
+        subgraph hostLin ["Host user"]
+            gtk["GTK shell<br/>owns agentide-core"]
+            core["agentide-core<br/>gh credentials stay here"]
+        end
+        subgraph sandboxLin ["Sandbox user sandvault-user"]
+            herdrLin["herdr server"]
+            agentsLin["Agent sessions"]
+        end
+        sharedLin[("Shared workspace<br/>/var/lib/agentide/user")]
+    end
+    githubLin["GitHub"]
+
+    gtk -->|"NDJSON"| core
+    core -->|"sudo enter plus bwrap"| herdrLin
+    herdrLin --- agentsLin
+    core <--> sharedLin
+    agentsLin <--> sharedLin
+    core -->|"gh CLI"| githubLin
+    ssh -->|"SSH as sandbox user"| herdrLin
 ```
 
 Boundary facts the design relies on:
@@ -89,10 +119,13 @@ plus resume.
 
 ### Launching into the sandbox
 
-sandvault's sudoers rules let the host user run exactly `/bin/zsh`,
-`/usr/bin/env` and `/usr/bin/true` as the sandbox user without a
-password, so every sandbox interaction uses one launch shape, assembled
-in exactly one place (`SandvaultLauncher`):
+Every sandbox interaction uses one launch shape, assembled in exactly
+one place through the `SandboxLaunching` protocol
+(`SandvaultLauncher` on Mac; `LinuxSandboxLauncher` on Linux).
+
+On macOS, sandvault's sudoers rules let the host user run exactly
+`/bin/zsh`, `/usr/bin/env` and `/usr/bin/true` as the sandbox user
+without a password:
 
 ```bash
 sudo --login --set-home --user="sandvault-${USER}" /usr/bin/env -i \
@@ -116,6 +149,24 @@ including the herdr server. Every launch passes through one function
 that refuses a path outside the shared workspace: the sandbox user can
 often read a host directory and must never be given a reason to write
 to one.
+
+On Linux, `contrib/agentide-sandbox` installs `/usr/libexec/agentide/enter`
+and a sudoers drop-in so the host may run only that helper as
+`sandvault-<host>`. `LinuxSandboxLauncher` builds:
+
+```bash
+sudo --login --set-home --user="sandvault-${USER}" \
+  /usr/libexec/agentide/enter \
+  --home="/home/sandvault-${USER}" \
+  --shared="/var/lib/agentide/${USER}" \
+  --workdir="${WORKTREE}" \
+  --session-id="$(uuidgen)" --session-name="${SESSION_NAME}" \
+  -- /bin/bash -lc "${PAYLOAD}"
+```
+
+`enter` execs bubblewrap with `--die-with-parent --new-session`,
+pid/ipc/uts namespaces (network kept), read-only system binds, and
+read-write binds of the sandbox home and shared workspace only.
 
 ### herdr
 
@@ -296,11 +347,14 @@ flowchart TD
     PR["PRFeature"]
     Terminal["TerminalUI"]
     Data["AgentIDEData<br/>(adapters)"]
+    Runtime["AgentIDERuntime"]
     Domain["AgentIDEDomain<br/>(pure)"]
 
     App --> Dashboard & Session & Review & PR & Data
     Dashboard & Session & Review & PR --> Domain & Data & Terminal
+    Dashboard --> Runtime
     Terminal --> Domain & Data
+    Runtime --> Domain & Data
     Data --> Domain
 ```
 
@@ -313,18 +367,29 @@ flowchart TD
   network and database APIs are banned.
 - **AgentIDEData**: the adapters, composed by `SessionService`:
   `GitClient`, `GitHubClient` (every question through the host's `gh`),
-  `SandvaultLauncher`, `HerdrClient`, `HerdrTerminalChannel`,
-  `TranscriptReader` and `CodexTranscriptIndex`, `EventSpool`,
-  `MetadataStore` (one JSON file), `PullRequestStore`, `ProcessRunner`
-  (Foundation `Process`), `WorkspaceWatcher` (FSEvents),
-  `FoundationModelClient` (the on-device model behind one summarisation
-  seam) and `AgentRunner` with `ClaudeCodeRunner` and `CodexRunner`.
+  `SandboxLaunching` (`SandvaultLauncher` on Mac;
+  `LinuxSandboxLauncher` on Linux), `HerdrClient`,
+  `HerdrTerminalChannel`, `TranscriptReader` and `CodexTranscriptIndex`,
+  `EventSpool`, `MetadataStore` (one JSON file), `PullRequestStore`,
+  `ProcessRunner` (Foundation `Process`), `FileWatching`
+  (`WorkspaceWatcher` via FSEvents on Mac; `InotifyWorkspaceWatcher`
+  mtime polling on Linux until full inotify lands), `OnDeviceSummarising`
+  (`FoundationModelClient` on Mac), `PowerObserving` (`IOKitPower` /
+  `UPowerSource`), `PlatformRoots`, and `AgentRunner` with
+  `ClaudeCodeRunner` and `CodexRunner`.
+- **agentide-core**: a small NDJSON stdin/stdout executable over Domain,
+  Data and Runtime (`ping`, `roots`, `quit`) that the Linux GTK shell
+  speaks to; available on every platform SwiftPM builds.
+- **AgentIDERuntime**: the shared poll and reconcile loop
+  (`RefreshCoalescer` today). Mac SwiftUI and the Linux GTK shell both
+  drive it; Phase 0 extracts refresh coalescing from `DashboardModel`.
+  Linux UI scaffolding lives under `Linux/` (Adwaita + Meson).
 - **Feature targets** (`DashboardFeature`, `SessionFeature`,
   `ReviewFeature`, `PRFeature`): SwiftUI views and `@Observable`
-  MainActor models given the service by injection. `SessionFeature` owns
-  the WKWebView browser, transcript log and session manager;
-  `ReviewFeature` the diff and editor (SwiftUI text and an attributed
-  `NSTextView`).
+  MainActor models given the service by injection. Mac-only;
+  `SessionFeature` owns the WKWebView browser, transcript log and
+  session manager; `ReviewFeature` the diff and editor (SwiftUI text
+  and an attributed `NSTextView`).
 - **TerminalUI**: shared components, not a feature: the SwiftTerm
   wrapper, markdown rendering, tooltips, `LinkOpener`, `BusyButton`,
   `LaunchProgress`, `SelectableTextView` (read-only document-style
@@ -372,6 +437,7 @@ Claude.
 |---|---|---|
 | AgentIDEDomain | nonisolated | Sendable value types by construction |
 | AgentIDEData | nonisolated | `@concurrent` on parsing and subprocess work |
+| AgentIDERuntime | nonisolated default; `@MainActor` types | refresh coalescing today |
 | Features, TerminalUI | MainActor | `@Observable` MainActor view models |
 | AgentIDEApp | MainActor | wiring only |
 
