@@ -1,8 +1,9 @@
 # AgentIDE on Linux (GTK scaffolding)
 
 Experimental Adwaita shell that drives the shared `agentide-core`
-NDJSON process. This is scaffolding only: no session UI, no VTE
-terminal pane yet, and Flatpak packaging is out of scope.
+NDJSON process. The sidebar lists `overview` worktrees; the content
+pane is a VTE placeholder when `vte-2.91-gtk4` is present. Session
+attach is not wired. Flatpak packaging is out of scope.
 
 ## Dependencies
 
@@ -12,12 +13,11 @@ terminal pane yet, and Flatpak packaging is out of scope.
 - A built `agentide-core` on `$PATH` (from this repository's Swift
   package: `swift build --product agentide-core`)
 
-Optional later: `vte-2.91` for a terminal pane.
-
 On Debian/Ubuntu:
 
 ```bash
-sudo apt install meson valac libadwaita-1-dev
+sudo apt install meson valac libadwaita-1-dev libjson-glib-dev \
+  libvte-2.91-gtk4-dev
 ```
 
 ## Build
@@ -35,9 +35,9 @@ export PATH="$(pwd)/../.build/debug:${PATH}"
 ./build/agentide
 ```
 
-The window titles itself AgentIDE, shows a sidebar placeholder, and
-spawns `agentide-core` with a `status` command. A successful reply
-updates the content label with the platform and version.
+The window titles itself AgentIDE, asks `agentide-core` for
+`overview`, lists those worktrees in the sidebar, and shows a VTE
+(or StatusPage) placeholder in the content pane.
 
 Smoke the NDJSON bridge without GTK:
 

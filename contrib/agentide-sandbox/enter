@@ -71,6 +71,45 @@ if [[ -z "${WORKDIR}" ]]; then
   WORKDIR="${HOME_DIR}"
 fi
 
+require_dir() {
+  local label="$1" path="$2"
+  if [[ "${path}" != /* ]]; then
+    echo "enter: ${label} must be an absolute path" >&2
+    exit 1
+  fi
+  if [[ ! -d "${path}" ]]; then
+    echo "enter: ${label} is not a directory: ${path}" >&2
+    exit 1
+  fi
+}
+
+require_dir --home "${HOME_DIR}"
+require_dir --shared "${SHARED}"
+require_dir --workdir "${WORKDIR}"
+
+# Refuse anything that is not the sandvault home or shared workspace.
+# The host user's HOME must never be bind-mounted.
+if [[ "${HOME_DIR}" != /home/sandvault-* ]]; then
+  echo "enter: --home must be under /home/sandvault-*" >&2
+  exit 1
+fi
+if [[ "${SHARED}" != /var/lib/agentide/* ]]; then
+  echo "enter: --shared must be under /var/lib/agentide" >&2
+  exit 1
+fi
+case "${WORKDIR}" in
+  "${HOME_DIR}"|"${HOME_DIR}"/*|"${SHARED}"|"${SHARED}"/*) ;;
+  *)
+    echo "enter: --workdir must be inside --home or --shared" >&2
+    exit 1
+    ;;
+esac
+
+if ! command -v bwrap >/dev/null 2>&1; then
+  echo "enter: bubblewrap (bwrap) is not on PATH" >&2
+  exit 1
+fi
+
 SANDBOX_USER="$(id -un)"
 PATH_VALUE="/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
 

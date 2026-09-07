@@ -20,6 +20,11 @@ if [[ -z "${HOST}" || "${HOST}" == root ]]; then
   exit 2
 fi
 
+if ! id -u "${HOST}" >/dev/null 2>&1; then
+  echo "Host user ${HOST} does not exist." >&2
+  exit 1
+fi
+
 if ! command -v bwrap >/dev/null 2>&1; then
   echo "bubblewrap (bwrap) is required; install it first." >&2
   exit 1
@@ -51,9 +56,18 @@ install -m 0755 "${SCRIPT_DIR}/enter" "${LIBEXEC}/enter"
 sed "s/\$HOST/${HOST}/g" "${SCRIPT_DIR}/sudoers" >"${SUDOERS}"
 chmod 0440 "${SUDOERS}"
 if command -v visudo >/dev/null 2>&1; then
-  visudo -cf "${SUDOERS}"
+  if ! visudo -cf "${SUDOERS}"; then
+    rm -f "${SUDOERS}"
+    echo "sudoers failed visudo; not installed." >&2
+    exit 1
+  fi
 fi
+
+mkdir -p "${SHARED}/tmp/agentide"
+chown "${HOST}:${SANDBOX_USER}" "${SHARED}/tmp" "${SHARED}/tmp/agentide" || true
+chmod 2770 "${SHARED}/tmp" || true
 
 echo "Installed AgentIDE sandbox for ${HOST} -> ${SANDBOX_USER}"
 echo "Shared workspace: ${SHARED}"
 echo "Entry helper: ${LIBEXEC}/enter"
+echo "Verify: ${SCRIPT_DIR}/verify.sh ${HOST}"

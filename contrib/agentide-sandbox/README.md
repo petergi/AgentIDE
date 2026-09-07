@@ -7,11 +7,15 @@ sudoers surface to a free-form shell.
 
 ## Requirements
 
-- Linux with [bubblewrap](https://github.com/containers/bubblewrap)
-  (`bwrap` on `$PATH`)
+- Ubuntu 24.04 or 26.04 (other distros may work; this is what is
+  aimed at)
+- [bubblewrap](https://github.com/containers/bubblewrap) (`bwrap` on
+  `$PATH` for both root and the sandbox user)
 - Root privileges to create the sandbox user and install sudoers
 - Optional: `acl` tools (`setfacl`) so both users share
   `/var/lib/agentide/<host>` with default ACLs
+- After install: `herdr` on the sandbox user's `PATH` (Linuxbrew in
+  `/home/linuxbrew` is bind-mounted read-only)
 
 ## Install
 
@@ -49,10 +53,20 @@ The installer:
 - Read-write binds of the sandbox home and shared workspace
 - A `tmpfs` on `/tmp`
 
-It never binds the host user's `HOME`. AgentIDE's
+It never binds the host user's `HOME`. `--home` must be under
+`/home/sandvault-*`, `--shared` under `/var/lib/agentide`, and
+`--workdir` inside one of those two. AgentIDE's
 `LinuxSandboxLauncher` builds the argv that reaches this helper.
 
 ## Verify
+
+Preferred, after a successful install:
+
+```bash
+./verify.sh "$USER"
+```
+
+Or by hand:
 
 ```bash
 sudo --login --set-home --user="sandvault-${USER}" \
