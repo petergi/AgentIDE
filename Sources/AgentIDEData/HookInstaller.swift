@@ -23,10 +23,11 @@ public struct HookInstaller: Sendable {
     /// Ensures the agentide directories, the hook script and the
     /// settings template entries all exist. Idempotent.
     public func ensureInstalled() throws {
-        let manager = FileManager.default
-        for directory in [paths.eventsDirectory, paths.promptsDirectory, paths.friendlyWorktreesDirectory] {
-            try manager.createDirectory(atPath: directory, withIntermediateDirectories: true)
-        }
+        try paths.ensureCreated()
+        try FileManager.default.createDirectory(
+            atPath: paths.friendlyWorktreesDirectory,
+            withIntermediateDirectories: true,
+        )
         try installScript()
         try installSettingsEntries()
     }

@@ -14,6 +14,7 @@ final class AppDependencies {
         let roots = PlatformRoots.detect()
         PerformanceLog.sharedTemporaryDirectory = roots.sharedTemporaryDirectory
         let paths = WorkspacePaths.current()
+        try? paths.ensureCreated()
         let runner = FoundationProcessRunner()
         let gitClient = GitClient(runner: runner)
         let githubClient = GitHubClient(runner: runner)

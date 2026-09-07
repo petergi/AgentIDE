@@ -385,7 +385,8 @@ flowchart TD
 - **AgentIDERuntime**: the shared poll and reconcile loop
   (`RefreshCoalescer` today). Mac SwiftUI and the Linux GTK shell both
   drive it; Phase 0 extracts refresh coalescing from `DashboardModel`.
-  Linux UI scaffolding lives under `Linux/` (Adwaita + Meson).
+  Linux UI scaffolding lives under `Linux/` (Adwaita + Meson):
+  `overview` in the sidebar and a VTE placeholder pane.
 - **Feature targets** (`DashboardFeature`, `SessionFeature`,
   `ReviewFeature`, `PRFeature`): SwiftUI views and `@Observable`
   MainActor models given the service by injection. Mac-only;
@@ -1092,7 +1093,10 @@ Two directories in the shared workspace are the app's own: `user/`, the
 template sandvault syncs into the sandbox home, where the agent hooks
 live and where your keys and shell configuration go, and `agentide/`,
 holding prompts, hook events and `session-defaults`, which remembers
-what the new session form and `agentide new` last chose. The app also
+what the new session form and `agentide new` last chose. On first
+launch the app also creates `repositories/` and `worktrees/` there;
+`gh` and git need those working directories to exist, and the
+repository finder lists GitHub from `repositories/`. The app also
 keeps `[worktrees] directory` in herdr's own configuration pointed at
 its layout, so `herdr worktree create` lands where the sidebar looks.
 

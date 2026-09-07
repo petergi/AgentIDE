@@ -132,8 +132,10 @@ script/install
 ```
 
 `script/install` copies the built app into /Applications so the running
-copy survives rebuilds. See [Ports / this fork](#-ports--this-fork) for
-`agentide-core` and the Ubuntu scaffolding.
+copy survives rebuilds. A first launch creates `repositories/` and
+`worktrees/` in the shared workspace if they are not there yet. See
+[Ports / this fork](#-ports--this-fork) for `agentide-core` and the
+Ubuntu scaffolding.
 
 ## 🌐 Ports / this fork
 
@@ -156,9 +158,10 @@ Linux desktop, and the Homebrew cask is not built from this fork.
   Install once as root (`sudo ./install.sh`); see its README.
 
 - **`Linux/`**: experimental Meson + Vala Adwaita shell that owns
-  `agentide-core` as a child process. Scaffolding only (sidebar
-  placeholder, `status` label); no session UI or VTE pane yet. Build
-  notes live in `Linux/README.md`.
+  `agentide-core` as a child process. The sidebar lists `overview`
+  worktrees; the content pane is a VTE placeholder when built with
+  `vte-2.91-gtk4`. No session attach yet. Build notes live in
+  `Linux/README.md`.
 
 - **Shared seams**: `Sources/AgentIDERuntime` (refresh coalescing),
   `PlatformRoots` (host/shared/sandbox paths per OS) and

@@ -1,5 +1,6 @@
 @testable import AgentIDEData
 import AgentIDEDomain
+import Foundation
 import Testing
 
 // MARK: - GitHubClientTests
@@ -193,5 +194,14 @@ struct GitHubClientTests {
         #expect(models.contains("gpt-5.6-luna"))
         #expect(models.contains("gpt-5.5"))
         #expect(models.contains("Available") == false)
+    }
+
+    @Test
+    func `a missing working directory is not handed to Process`() {
+        let temporary = FileManager.default.temporaryDirectory.path
+        #expect(GitHubClient.usableWorkingDirectory(nil) == nil)
+        #expect(GitHubClient.usableWorkingDirectory("") == nil)
+        #expect(GitHubClient.usableWorkingDirectory("/no/such/agentide-cwd") == nil)
+        #expect(GitHubClient.usableWorkingDirectory(temporary) == temporary)
     }
 }

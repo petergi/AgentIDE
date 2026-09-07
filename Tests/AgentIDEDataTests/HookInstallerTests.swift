@@ -46,5 +46,7 @@ struct HookInstallerTests {
 
         let script = paths.userTemplateDirectory + "/.claude/agentide-notify.sh"
         #expect(FileManager.default.isExecutableFile(atPath: script))
+        #expect(FileManager.default.fileExists(atPath: paths.repositoriesDirectory))
+        #expect(FileManager.default.fileExists(atPath: paths.worktreesDirectory))
     }
 }

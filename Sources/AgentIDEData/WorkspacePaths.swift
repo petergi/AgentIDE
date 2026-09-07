@@ -108,6 +108,22 @@ public struct WorkspacePaths: Sendable {
         )
     }
 
+    /// Creates the checkout and worktree directories a first launch
+    /// needs. `gh` and git both refuse a working directory that is
+    /// not there yet; without this the repository finder spun forever
+    /// on a fresh sandvault workspace.
+    public func ensureCreated() throws {
+        let manager = FileManager.default
+        for directory in [
+            repositoriesDirectory,
+            worktreesDirectory,
+            eventsDirectory,
+            promptsDirectory,
+        ] {
+            try manager.createDirectory(atPath: directory, withIntermediateDirectories: true)
+        }
+    }
+
     // MARK: Private
 
     /// A non-empty Settings override for a location key.

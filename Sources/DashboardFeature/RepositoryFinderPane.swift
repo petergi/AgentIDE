@@ -51,6 +51,7 @@ public struct RepositoryFinderPane: View {
     @State private var owners: [String] = []
     @State private var repositories: [String] = []
     @State private var highlighted = 0
+    @State private var listingsReady = false
 
     private let model: DashboardModel
 
@@ -90,8 +91,14 @@ public struct RepositoryFinderPane: View {
                     .textSelection(.enabled)
             }
             if results.isEmpty, query.isEmpty {
-                ProgressView(owner == nil ? "Listing organisations…" : "Listing repositories…")
-                    .frame(maxWidth: .infinity, minHeight: Self.listHeight)
+                if listingsReady {
+                    Text(owner == nil ? "No organisations found." : "No repositories found.")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: Self.listHeight)
+                } else {
+                    ProgressView(owner == nil ? "Listing organisations…" : "Listing repositories…")
+                        .frame(maxWidth: .infinity, minHeight: Self.listHeight)
+                }
             } else {
                 resultsList
             }
@@ -105,14 +112,18 @@ public struct RepositoryFinderPane: View {
         .task {
             fieldFocused = true
             owners = model.cachedOrganisations()
+            listingsReady = owners.isEmpty == false
             owners = await model.organisations()
+            listingsReady = true
         }
         .task(id: owner) {
             guard let owner else {
+                listingsReady = owners.isEmpty == false || listingsReady
                 return
             }
 
             repositories = model.cachedRepositories(owner: owner)
+            listingsReady = repositories.isEmpty == false
             let fresh = await model.repositories(owner: owner)
             // A slow answer for a previously picked owner must not
             // overwrite the currently shown owner's list.
@@ -121,6 +132,7 @@ public struct RepositoryFinderPane: View {
             }
 
             repositories = fresh
+            listingsReady = true
         }
     }
 
@@ -228,6 +240,7 @@ public struct RepositoryFinderPane: View {
 
         owner = result
         repositories = []
+        listingsReady = false
         query = ""
         highlighted = 0
     }
@@ -235,6 +248,7 @@ public struct RepositoryFinderPane: View {
     private func stepBack() {
         owner = nil
         repositories = []
+        listingsReady = owners.isEmpty == false
         query = ""
         highlighted = 0
     }
