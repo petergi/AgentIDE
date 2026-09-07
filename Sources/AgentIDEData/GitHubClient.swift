@@ -114,6 +114,7 @@ public struct GitHubClient: Sendable {
     /// repository, using the host's credentials.
     public func clone(fullName: String, into directory: String) async throws {
         let name = fullName.split(separator: "/").last.map(String.init) ?? fullName
+        try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
         try await gh(["repo", "clone", fullName, name], in: directory)
     }
 
@@ -298,6 +299,23 @@ public struct GitHubClient: Sendable {
         }
     }
 
+    /// A working directory Process can actually enter. Listing does
+    /// not need a checkout; a missing path made every `gh` fail.
+    static func usableWorkingDirectory(_ directory: String?) -> String? {
+        guard let directory, directory.isEmpty == false else {
+            return nil
+        }
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory),
+              isDirectory.boolValue
+        else {
+            return nil
+        }
+
+        return directory
+    }
+
     @discardableResult
     func gh(
         _ arguments: [String],
@@ -314,12 +332,13 @@ public struct GitHubClient: Sendable {
 
         // `gh` is the app's network: the process funnel already
         // times it, and this line says which calls were GitHub's.
+        let workingDirectory = Self.usableWorkingDirectory(directory)
         let result = try await PerformanceLog.time(
             .network,
             "gh " + arguments.prefix(Self.loggedWords).joined(separator: " "),
-            context: directory ?? "",
+            context: workingDirectory ?? "",
         ) {
-            try await runner.run(["gh"] + arguments, workingDirectory: directory, environment: [:])
+            try await runner.run(["gh"] + arguments, workingDirectory: workingDirectory, environment: [:])
         }
         guard result.succeeded || allowFailure else {
             throw CommandError(command: "gh " + arguments.joined(separator: " "), result: result)

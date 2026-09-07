@@ -69,3 +69,6 @@ fastlane/test_output
 
 # Test scratch
 .test-scratch/
+
+# Serena local project cache
+.serena/

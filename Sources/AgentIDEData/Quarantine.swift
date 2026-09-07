@@ -14,34 +14,50 @@ enum Quarantine {
     // MARK: Internal
 
     /// Where Homebrew links agent commands.
-    static let homebrewBinaries = ["/opt/homebrew/bin", "/usr/local/bin"]
+    static let homebrewBinaries = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/home/linuxbrew/.linuxbrew/bin",
+    ]
 
     /// Clears the attribute from every file beside the agent's real
     /// binary, a cask's `bin` holding the helpers the agent launches,
-    /// and returns the files it cleared.
+    /// and returns the files it cleared. On Linux there is no
+    /// Gatekeeper quarantine attribute, so this is a no-op.
     static func clear(for agent: AgentKind, binaryDirectories: [String] = homebrewBinaries) -> [String] {
-        for directory in binaryDirectories {
-            let link = directory + "/" + agent.rawValue
-            guard FileManager.default.fileExists(atPath: link) else {
-                continue
-            }
+        #if os(macOS)
+            for directory in binaryDirectories {
+                let link = directory + "/" + agent.rawValue
+                guard FileManager.default.fileExists(atPath: link) else {
+                    continue
+                }
 
-            let install = URL(filePath: link).resolvingSymlinksInPath().deletingLastPathComponent()
-            let files = try? FileManager.default.contentsOfDirectory(at: install, includingPropertiesForKeys: nil)
-            return (files ?? []).map(\.path).filter(isQuarantined).sorted().filter(clear)
-        }
-        return []
+                let install = URL(filePath: link).resolvingSymlinksInPath().deletingLastPathComponent()
+                let files = try? FileManager.default.contentsOfDirectory(
+                    at: install,
+                    includingPropertiesForKeys: nil,
+                )
+                return (files ?? []).map(\.path).filter(isQuarantined).sorted().filter(clear)
+            }
+            return []
+        #else
+            _ = agent
+            _ = binaryDirectories
+            return []
+        #endif
     }
 
     // MARK: Private
 
-    private static let attribute = "com.apple.quarantine"
+    #if os(macOS)
+        private static let attribute = "com.apple.quarantine"
 
-    private static func isQuarantined(_ path: String) -> Bool {
-        getxattr(path, attribute, nil, 0, 0, 0) >= 0
-    }
+        private static func isQuarantined(_ path: String) -> Bool {
+            getxattr(path, attribute, nil, 0, 0, 0) >= 0
+        }
 
-    private static func clear(_ path: String) -> Bool {
-        removexattr(path, attribute, 0) == 0
-    }
+        private static func clear(_ path: String) -> Bool {
+            removexattr(path, attribute, 0) == 0
+        }
+    #endif
 }

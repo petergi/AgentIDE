@@ -256,20 +256,22 @@ public extension SessionService {
     }
 
     /// The user's login and organisations, for the repository
-    /// finder's owner step. Empty when GitHub is unreachable.
-    func organisations() async -> [String] {
-        await (try? github.organisations(directory: paths.repositoriesDirectory)) ?? []
+    /// finder's owner step.
+    func organisations() async throws -> [String] {
+        try paths.ensureCreated()
+        return try await github.organisations(directory: paths.repositoriesDirectory)
     }
 
-    /// Every repository under one owner on GitHub. Empty when GitHub
-    /// is unreachable.
-    func repositories(owner: String) async -> [String] {
-        await (try? github.repositories(owner: owner, directory: paths.repositoriesDirectory)) ?? []
+    /// Every repository under one owner on GitHub.
+    func repositories(owner: String) async throws -> [String] {
+        try paths.ensureCreated()
+        return try await github.repositories(owner: owner, directory: paths.repositoriesDirectory)
     }
 
     /// Clones a repository into the shared workspace when it is not
     /// already there, returning it either way.
     func cloneRepository(fullName: String) async throws -> Repository {
+        try paths.ensureCreated()
         let name = fullName.split(separator: "/").last.map(String.init) ?? fullName
         let path = paths.repositoriesDirectory + "/" + name
         if FileManager.default.fileExists(atPath: path) == false {

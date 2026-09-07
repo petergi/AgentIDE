@@ -99,16 +99,29 @@ public struct WorkspacePaths: Sendable {
     /// Creates paths for the current process, stripping any sandvault
     /// prefix so the same paths work inside and outside the sandbox.
     public static func current() -> Self {
-        let user = NSUserName()
-        let prefix = "sandvault-"
-        let host = user.hasPrefix(prefix) ? String(user.dropFirst(prefix.count)) : user
-        let support = NSHomeDirectory() + "/Library/Application Support/AgentIDE"
+        let roots = PlatformRoots.detect()
         return Self(
-            hostUser: host,
-            sharedWorkspace: "/Users/Shared/sv-" + host,
-            sandboxHome: "/Users/sandvault-" + host,
-            metadataFile: support + "/state.json",
+            hostUser: roots.hostUser,
+            sharedWorkspace: roots.sharedWorkspace,
+            sandboxHome: roots.sandboxHome,
+            metadataFile: roots.metadataFile,
         )
+    }
+
+    /// Creates the checkout and worktree directories a first launch
+    /// needs. `gh` and git both refuse a working directory that is
+    /// not there yet; without this the repository finder spun forever
+    /// on a fresh sandvault workspace.
+    public func ensureCreated() throws {
+        let manager = FileManager.default
+        for directory in [
+            repositoriesDirectory,
+            worktreesDirectory,
+            eventsDirectory,
+            promptsDirectory,
+        ] {
+            try manager.createDirectory(atPath: directory, withIntermediateDirectories: true)
+        }
     }
 
     // MARK: Private

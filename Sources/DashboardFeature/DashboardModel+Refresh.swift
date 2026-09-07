@@ -4,8 +4,8 @@ import Foundation
 import UserNotifications
 
 /// The poll and the one refresh path every action shares. Split from
-/// the model body for length; the coalescing fields live there,
-/// since extensions cannot hold state.
+/// the model body for length; coalescing state lives on
+/// `runtime.refresh`.
 public extension DashboardModel {
     /// How often the system is re-read while the dashboard is alive
     /// (Settings can slow it); `RefreshCadence` slows it while the
@@ -34,40 +34,39 @@ public extension DashboardModel {
     /// since an action or an agent change is what changes it; the
     /// tick reuses the last listing until its safety interval is up.
     func refresh(forcing repositoryPath: String? = nil, readingPanes: Bool = true) async {
-        if let repositoryPath {
-            pendingForces.insert(repositoryPath)
-        }
+        runtime.refresh.force(repositoryPath)
         if readingPanes {
-            pendingPaneRead = true
+            runtime.refresh.requestPaneRead()
         }
         // A queued reading has not started, so it must begin after
         // this call: joining it keeps the promise.
-        if let queued = queuedRefresh {
+        let coalescer = runtime.refresh
+        if let queued = coalescer.queuedRefresh {
             await queued.value
             return
         }
-        if let running = refreshTask {
+        if let running = coalescer.refreshTask {
             let queued = Task {
                 await running.value
                 // Promote: this run is now the current one, and the
                 // queued slot opens for the next caller. The slot
                 // still holds this task, since joiners never
                 // replace a queued reading.
-                refreshTask = queuedRefresh
-                queuedRefresh = nil
+                coalescer.refreshTask = coalescer.queuedRefresh
+                coalescer.queuedRefresh = nil
                 await performRefresh()
-                refreshTask = nil
+                coalescer.refreshTask = nil
             }
-            queuedRefresh = queued
+            coalescer.queuedRefresh = queued
             await queued.value
             return
         }
 
         let task = Task {
             await performRefresh()
-            refreshTask = nil
+            coalescer.refreshTask = nil
         }
-        refreshTask = task
+        coalescer.refreshTask = task
         await task.value
     }
 
@@ -132,11 +131,10 @@ public extension DashboardModel {
     /// activity as seen, since it is on screen; a manual unread
     /// mark survives.
     private func performRefresh() async {
-        let forces = pendingForces
-        pendingForces = []
-        let readsPanes = pendingPaneRead
-            || RefreshCadence.panesDue(lastRead: panesReadAt, now: Date(), onBattery: isOnBattery())
-        pendingPaneRead = false
+        let forces = runtime.refresh.takeForces()
+        let readsPanes = runtime.refresh.takePaneRead(
+            due: RefreshCadence.panesDue(lastRead: panesReadAt, now: Date(), onBattery: isOnBattery()),
+        )
         if readsPanes {
             panesReadAt = Date()
         }

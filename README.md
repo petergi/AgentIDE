@@ -9,6 +9,9 @@ worktree, conversation, review, pull request and CI, is one window in
 one app rather than several. Built with SwiftUI on top of
 [sandvault](https://github.com/webcoyote/sandvault),
 [`herdr`](https://herdr.dev) and the [`gh`](https://cli.github.com) CLI.
+This checkout is [petergi/AgentIDE](https://github.com/petergi/AgentIDE),
+a fork exploring multi-OS ports (macOS 15+ and experimental Ubuntu),
+distinct from the upstream Homebrew cask product.
 
 ## 💡 Motivation
 
@@ -66,17 +69,27 @@ updates.
 
 ## 🚫 Out of Scope
 
-- Windows or Linux support; being a native macOS app is the point.
+- Windows support.
+- Flatpak (and the Mac App Store): neither can honestly `sudo` to another
+  uid or create the sandbox user, which is the same reason agents cannot
+  run as another user from those sandboxes.
 - Running agents without a sandboxed non-admin user.
-- Team, multi-user or hosted features: one developer, one Mac.
+- Team, multi-user or hosted features: one developer, one machine.
 - An agent marketplace or bundled models; bring your own agent CLI.
 - A native iOS app: SSH into `herdr` from any iOS client instead.
-- An updater or a Mac App Store build; Homebrew's cask upgrades it, and
-  the App Store sandbox forbids running agents as another user.
+- An updater of its own; upstream Mac releases upgrade through
+  Homebrew's cask, not this fork's builds.
+- Linux desktop feature parity with the Mac app: Ubuntu work here is
+  scaffolding only.
 
 ## 📋 Requirements
 
-- macOS Golden Gate (27) or later.
+### macOS
+
+- macOS Sequoia (15) or later. One binary; Liquid Glass and on-device
+  Foundation Models need macOS 26+. If a Sequoia host cannot load the
+  Swift 6.4 stdlib, raise the floor to macOS 26 and treat 15 as
+  unsupported rather than shipping a broken binary.
 - [Homebrew](https://brew.sh), which installs the rest.
 - [sandvault](https://github.com/webcoyote/sandvault), which creates the
   sandbox user and the shared workspace.
@@ -86,26 +99,65 @@ updates.
   by `script/bootstrap`; `mosh` only matters from a phone.
 - Xcode 27 or later, only to build from source.
 
+### Ubuntu (parked)
+
+Linux GTK, sandbox `enter` and the inotify stand-in live on
+`pause/linux`. This branch does not grow them.
+
 ## 📦 Installation
+
+Upstream Mac releases (not this fork) install with:
 
 ```bash
 brew install --cask agentide
 ```
 
 The [`agentide` cask](https://github.com/Homebrew/homebrew-cask/blob/main/Casks/a/agentide.rb)
-installs the latest release, and `brew upgrade` updates it. Releases are
-signed with a Developer ID certificate and notarised by Apple.
-
-Without Homebrew, download `AgentIDE-<version>.zip` from the
+tracks [MikeMcQuaid/AgentIDE](https://github.com/MikeMcQuaid/AgentIDE)
+releases, signed with a Developer ID certificate and notarised by Apple.
+Without Homebrew, download `AgentIDE-<version>.zip` from that project's
 [releases page](https://github.com/MikeMcQuaid/AgentIDE/releases), unzip
 it and move `AgentIDE.app` to /Applications.
 
-To run the current source instead:
+To run **this** checkout's Mac app from source:
 
 ```bash
 script/bootstrap
+script/build
 script/install
 ```
+
+`script/install` copies the built app into /Applications so the running
+copy survives rebuilds. A first launch creates `repositories/` and
+`worktrees/` in the shared workspace if they are not there yet. See
+[Ports / this fork](#-ports--this-fork) for `agentide-core`; Linux
+work is on `pause/linux`.
+
+## 🌐 Ports / this fork
+
+This branch is the Mac app. Linux GTK, `contrib/agentide-sandbox` and
+the inotify stand-in are parked on `pause/linux` until the Mac path is
+finished. Shared Domain, Data and Runtime stay in this tree; do not
+grow the Ubuntu shell here. The Homebrew cask is not built from this
+fork.
+
+- **`agentide-core`**: NDJSON stdin/stdout bridge over Domain, Data and
+  Runtime. Commands: `ping`, `status`, `roots`, `overview`, `quit`
+  (unknown commands reply `{ok:false}` without exiting). Smoke it with
+  `script/agentide-core-smoke`, or build and talk to it by hand:
+
+  ```bash
+  swift build --product agentide-core
+  script/agentide-core-smoke
+  ```
+
+- **Parked on `pause/linux`**: `Linux/` (experimental Adwaita shell),
+  `contrib/agentide-sandbox` (bubblewrap `enter`), and the Linux file
+  watcher. Resume there only after the Mac app is polished.
+
+Mac app from this tree: `script/bootstrap`, then `script/build` or
+`script/install` (→ /Applications). Architecture detail is in
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## ⚙️ Configuration
 
@@ -189,20 +241,27 @@ same session the Mac shows.
 - `script/analyze`: static analysis and dead code
 - `script/zip` and `script/package`: zip, sign and notarise a release
 - `script/attach`: attach this terminal to the sandboxed `herdr` session
+- `script/agentide-core-smoke`: NDJSON dialogue against `agentide-core`
 
-Releases run the **Release** workflow from the Actions tab on `main` with
-a bare `MAJOR.MINOR.PATCH` version.
+Upstream releases run the **Release** workflow from the Actions tab on
+`main` with a bare `MAJOR.MINOR.PATCH` version. Port work on this fork
+lives on `cross-platform`; see [Ports / this fork](#-ports--this-fork).
 
 ## 🚧 Status
 
-Stable but changing daily. AgentIDE is being designed exclusively for
+Stable but changing daily on macOS (the product the Mac app still is).
+This fork's Ubuntu support is experimental scaffolding
+(`agentide-core`, `contrib/agentide-sandbox`, `Linux/`), not a shipping
+desktop. Upstream AgentIDE is designed primarily for
 [@MikeMcQuaid](https://github.com/MikeMcQuaid)'s personal workflow;
 nothing here promises to suit anyone else's, interfaces and behaviour may
 break without notice and there is no support.
 
 ## 📮 Contact
 
-[Mike McQuaid](mailto:mike@mikemcquaid.com)
+Upstream: [Mike McQuaid](mailto:mike@mikemcquaid.com).
+Port questions for this fork: open an issue on
+[petergi/AgentIDE](https://github.com/petergi/AgentIDE).
 
 ## 📄 Licence
 

@@ -1,0 +1,35 @@
+#!/bin/bash
+# Pipe a short NDJSON dialogue through agentide-core and check the
+# replies. Builds the product first when the binary is missing.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+core=".build/debug/agentide-core"
+if [[ ! -x "${core}" ]]; then
+  swift build --product agentide-core --disable-sandbox
+fi
+
+output="$(
+  printf '%s\n' \
+    '{"cmd":"ping"}' \
+    '{"cmd":"status"}' \
+    '{"cmd":"roots"}' \
+    '{"cmd":"quit"}' |
+    "${core}"
+)"
+
+echo "${output}"
+
+line_count="$(printf '%s\n' "${output}" | wc -l | tr -d ' ')"
+if [[ "${line_count}" -ne 4 ]]; then
+  echo "expected 4 reply lines, got ${line_count}" >&2
+  exit 1
+fi
+
+printf '%s\n' "${output}" | grep -q '"pong":true'
+printf '%s\n' "${output}" | grep -q '"platform":'
+printf '%s\n' "${output}" | grep -q '"sharedWorkspace":'
+printf '%s\n' "${output}" | grep -q '"ok":true'
+
+echo "agentide-core smoke passed"

@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Enter the AgentIDE Linux sandbox via bubblewrap. Installed as
+# /usr/libexec/agentide/enter and invoked through sudo as the
+# sandvault user. Never binds the host user's HOME.
+set -euo pipefail
+
+HOME_DIR=""
+SHARED=""
+WORKDIR=""
+SESSION_ID=""
+SESSION_NAME=""
+
+usage() {
+  echo "Usage: enter --home=DIR --shared=DIR [--workdir=DIR]" >&2
+  echo "             [--session-id=ID] [--session-name=NAME] -- COMMAND..." >&2
+  exit 2
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --home=*) HOME_DIR="${1#*=}"; shift ;;
+    --home)
+      HOME_DIR="${2:-}"
+      shift 2
+      ;;
+    --shared=*) SHARED="${1#*=}"; shift ;;
+    --shared)
+      SHARED="${2:-}"
+      shift 2
+      ;;
+    --workdir=*) WORKDIR="${1#*=}"; shift ;;
+    --workdir)
+      WORKDIR="${2:-}"
+      shift 2
+      ;;
+    --session-id=*) SESSION_ID="${1#*=}"; shift ;;
+    --session-id)
+      SESSION_ID="${2:-}"
+      shift 2
+      ;;
+    --session-name=*) SESSION_NAME="${1#*=}"; shift ;;
+    --session-name)
+      SESSION_NAME="${2:-}"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -h | --help)
+      usage
+      ;;
+    *)
+      echo "enter: unknown argument: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+if [[ -z "${HOME_DIR}" || -z "${SHARED}" ]]; then
+  echo "enter: --home and --shared are required" >&2
+  usage
+fi
+
+if [[ $# -lt 1 ]]; then
+  echo "enter: a command is required after --" >&2
+  usage
+fi
+
+if [[ -z "${WORKDIR}" ]]; then
+  WORKDIR="${HOME_DIR}"
+fi
+
+SANDBOX_USER="$(id -un)"
+PATH_VALUE="/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
+
+bwrap_args=(
+  --die-with-parent
+  --new-session
+  --unshare-pid
+  --unshare-ipc
+  --unshare-uts
+  --proc /proc
+  --dev /dev
+  --tmpfs /tmp
+  --ro-bind /usr /usr
+  --ro-bind /bin /bin
+  --ro-bind /sbin /sbin
+  --ro-bind-try /lib /lib
+  --ro-bind-try /lib64 /lib64
+  --ro-bind-try /etc/ssl /etc/ssl
+  --ro-bind-try /etc/resolv.conf /etc/resolv.conf
+  --ro-bind-try /etc/passwd /etc/passwd
+  --ro-bind-try /etc/group /etc/group
+  --ro-bind-try /etc/nsswitch.conf /etc/nsswitch.conf
+  --ro-bind-try /home/linuxbrew /home/linuxbrew
+  --bind "${HOME_DIR}" "${HOME_DIR}"
+  --bind "${SHARED}" "${SHARED}"
+  --chdir "${WORKDIR}"
+  --setenv HOME "${HOME_DIR}"
+  --setenv USER "${SANDBOX_USER}"
+  --setenv LOGNAME "${SANDBOX_USER}"
+  --setenv SHELL /bin/bash
+  --setenv TERM "${TERM:-xterm-256color}"
+  --setenv COLORTERM "${COLORTERM:-truecolor}"
+  --setenv LANG "${LANG:-C.UTF-8}"
+  --setenv PATH "${PATH_VALUE}"
+  --setenv SHARED_WORKSPACE "${SHARED}"
+  --setenv INITIAL_DIR "${WORKDIR}"
+  --setenv SV_SESSION_ID "${SESSION_ID}"
+  --setenv AGENTIDE_SESSION "${SESSION_NAME}"
+  --setenv GIT_CONFIG_COUNT 1
+  --setenv GIT_CONFIG_KEY_0 safe.directory
+  --setenv GIT_CONFIG_VALUE_0 "${SHARED}/*"
+)
+
+exec bwrap "${bwrap_args[@]}" -- "$@"

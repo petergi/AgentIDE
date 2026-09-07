@@ -13,15 +13,21 @@ public extension DashboardModel {
     /// launch. An empty answer keeps the cache: GitHub was probably
     /// unreachable.
     func organisations() async -> [String] {
-        let fresh = await service.organisations()
-        guard fresh.isEmpty == false else {
+        do {
+            let fresh = try await service.organisations()
+            guard fresh.isEmpty == false else {
+                return cachedOrganisations()
+            }
+
+            store.update { metadata in
+                metadata.organisations = fresh
+            }
+            screenError = nil
+            return fresh
+        } catch {
+            screenError = error.localizedDescription
             return cachedOrganisations()
         }
-
-        store.update { metadata in
-            metadata.organisations = fresh
-        }
-        return fresh
     }
 
     /// The owner's repositories listed last time, for an instant
@@ -33,15 +39,21 @@ public extension DashboardModel {
     /// Every repository under an owner, cached per owner like the
     /// organisations.
     func repositories(owner: String) async -> [String] {
-        let fresh = await service.repositories(owner: owner)
-        guard fresh.isEmpty == false else {
+        do {
+            let fresh = try await service.repositories(owner: owner)
+            guard fresh.isEmpty == false else {
+                return cachedRepositories(owner: owner)
+            }
+
+            store.update { metadata in
+                metadata.ownerRepositories[owner] = fresh
+            }
+            screenError = nil
+            return fresh
+        } catch {
+            screenError = error.localizedDescription
             return cachedRepositories(owner: owner)
         }
-
-        store.update { metadata in
-            metadata.ownerRepositories[owner] = fresh
-        }
-        return fresh
     }
 
     /// The cached open issues and pull requests for the pickers.

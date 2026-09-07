@@ -1,5 +1,9 @@
-import Network
-import Synchronization
+#if os(macOS)
+    import Network
+    import Synchronization
+#endif
+
+// MARK: - NetworkMonitor
 
 /// Whether this machine has a route to the internet at all, from
 /// the system's own path monitor rather than a poll of our own.
@@ -8,13 +12,15 @@ import Synchronization
 /// network answers each one with the same failure: without this the
 /// messages pane filled with one identical complaint per branch per
 /// poll, and the app kept spawning processes that could not succeed.
+/// On Linux, `Network.framework` is unavailable, so the monitor
+/// reports online until a dedicated observer lands.
 public final class NetworkMonitor: Sendable {
     // MARK: Lifecycle
 
     /// Creates a monitor; nothing is watched until `changes` is
     /// consumed.
     public init() {
-        // The path monitor is created per stream.
+        // The path monitor is created per stream on macOS.
     }
 
     deinit {
@@ -33,49 +39,62 @@ public final class NetworkMonitor: Sendable {
     /// True until told otherwise, so nothing waits on a first
     /// answer to do its work.
     public var isOnline: Bool {
-        online.withLock { $0 != .offline }
+        #if os(macOS)
+            online.withLock { $0 != .offline }
+        #else
+            true
+        #endif
     }
 
     /// Every change in whether the machine has a route. The first
     /// reading arrives too, so a launch with no network says so
     /// rather than waiting for the connection to drop.
     public func changes() -> AsyncStream<Bool> {
-        AsyncStream { continuation in
-            let monitor = NWPathMonitor()
-            monitor.pathUpdateHandler = { path in
-                let satisfied = path.status == .satisfied
-                // The held reading starts unknown, so the first
-                // answer is news whichever way it goes.
-                let seen: Reachability = satisfied ? .online : .offline
-                let isNews = self.online.withLock { held in
-                    let changed = held != seen
-                    held = seen
-                    return changed
-                }
-                guard isNews else {
-                    return
-                }
+        #if os(macOS)
+            AsyncStream { continuation in
+                let monitor = NWPathMonitor()
+                monitor.pathUpdateHandler = { path in
+                    let satisfied = path.status == .satisfied
+                    // The held reading starts unknown, so the first
+                    // answer is news whichever way it goes.
+                    let seen: Reachability = satisfied ? .online : .offline
+                    let isNews = self.online.withLock { held in
+                        let changed = held != seen
+                        held = seen
+                        return changed
+                    }
+                    guard isNews else {
+                        return
+                    }
 
-                continuation.yield(satisfied)
+                    continuation.yield(satisfied)
+                }
+                continuation.onTermination = { _ in monitor.cancel() }
+                monitor.start(queue: Self.queue)
             }
-            continuation.onTermination = { _ in monitor.cancel() }
-            monitor.start(queue: Self.queue)
-        }
+        #else
+            AsyncStream { continuation in
+                continuation.yield(true)
+                continuation.finish()
+            }
+        #endif
     }
 
     // MARK: Private
 
-    /// Unknown until the system has answered once, which reads as
-    /// online, so nothing is held back waiting for a first answer.
-    private enum Reachability {
-        case unknown
-        case online
-        case offline
-    }
+    #if os(macOS)
+        /// Unknown until the system has answered once, which reads as
+        /// online, so nothing is held back waiting for a first answer.
+        private enum Reachability {
+            case unknown
+            case online
+            case offline
+        }
 
-    /// The path monitor's own queue: system callbacks, never the
-    /// main actor.
-    private static let queue: DispatchQueue = .init(label: "agentide.network-path")
+        /// The path monitor's own queue: system callbacks, never the
+        /// main actor.
+        private static let queue: DispatchQueue = .init(label: "agentide.network-path")
 
-    private let online: Mutex<Reachability> = .init(.unknown)
+        private let online: Mutex<Reachability> = .init(.unknown)
+    #endif
 }
